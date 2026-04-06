@@ -13,14 +13,24 @@
 #include <nlohmann/json.hpp>
 #include "spirv_reflect.h"
 
-static VkShaderStageFlags stage_flag_from_name(const std::string& stage) {
+static VkShaderStageFlagBits stage_flag_from_name(const std::string& stage) {
     if (stage == "vert") return VK_SHADER_STAGE_VERTEX_BIT;
     if (stage == "tesc") return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
     if (stage == "tese") return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
     if (stage == "geom") return VK_SHADER_STAGE_GEOMETRY_BIT;
     if (stage == "frag") return VK_SHADER_STAGE_FRAGMENT_BIT;
     if (stage == "comp") return VK_SHADER_STAGE_COMPUTE_BIT;
-    return 0;
+    throw std::runtime_error("Unknown shader stage name " + stage);
+}
+
+static std::string stage_flag_format(const std::string& stage) {
+    if (stage == "vert") return "VK_SHADER_STAGE_VERTEX_BIT";
+    if (stage == "tesc") return "VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT";
+    if (stage == "tese") return "VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT";
+    if (stage == "geom") return "VK_SHADER_STAGE_GEOMETRY_BIT";
+    if (stage == "frag") return "VK_SHADER_STAGE_FRAGMENT_BIT";
+    if (stage == "comp") return "VK_SHADER_STAGE_COMPUTE_BIT";
+    throw std::runtime_error("Unknown shader stage name " + stage);
 }
 
 static std::string format_stage_flags(uint32_t flags) {
@@ -209,7 +219,7 @@ int main(int argc, char** argv) {
         std::string ogl_fn  = spv_fn.substr(0, spv_fn.size() - 4) + ".ogl.glsl";
 
         nlohmann::json vks;
-        vks["stage_flags"] = format_stage_flags(stage_flag_from_name(stage));
+        vks["stage_flags"] = stage_flag_format(stage);
         vks["filename"]    = spv_fn;
         vk_sources.push_back(vks);
 

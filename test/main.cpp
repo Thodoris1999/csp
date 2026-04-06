@@ -104,13 +104,13 @@ int main() {
         all_ok = false;
     }
 
-    if ((triangle_ShaderInfo::csp_vk_sources[0].stage & VK_SHADER_STAGE_VERTEX_BIT) == 0) {
-        std::fprintf(stderr, "FAIL: csp_vk_sources[0].stage does not include VK_SHADER_STAGE_VERTEX_BIT\n");
+    if (triangle_ShaderInfo::csp_vk_sources[0].stage != VK_SHADER_STAGE_VERTEX_BIT) {
+        std::fprintf(stderr, "FAIL: csp_vk_sources[0].stage is not VK_SHADER_STAGE_VERTEX_BIT\n");
         all_ok = false;
     }
 
-    if ((triangle_ShaderInfo::csp_vk_sources[1].stage & VK_SHADER_STAGE_FRAGMENT_BIT) == 0) {
-        std::fprintf(stderr, "FAIL: csp_vk_sources[1].stage does not include VK_SHADER_STAGE_FRAGMENT_BIT\n");
+    if (triangle_ShaderInfo::csp_vk_sources[1].stage != VK_SHADER_STAGE_FRAGMENT_BIT) {
+        std::fprintf(stderr, "FAIL: csp_vk_sources[1].stage is not VK_SHADER_STAGE_FRAGMENT_BIT\n");
         all_ok = false;
     }
 

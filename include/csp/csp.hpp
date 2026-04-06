@@ -20,7 +20,7 @@ struct OglShaderSource {
 };
 
 struct VkShaderSource {
-    VkShaderStageFlags stage;
+    VkShaderStageFlagBits stage;
     std::string_view   filename;
 };
 

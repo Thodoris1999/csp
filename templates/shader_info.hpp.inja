@@ -10,7 +10,7 @@
 {% endfor %}
 
 struct {{ program_name }}_ShaderInfo {
-    // Push constant entries carry offset/size/stage_flags (VkShaderStageFlags) for vkCmdPushConstants.
+    // Push constant entries carry offset/size/stage_flags (VkShaderStageFlagBits bitmask) for vkCmdPushConstants.
     // Non-push-constant entries have offset=0, size=0, stage_flags=0.
     static constexpr csp::VkPushConstantEntry csp_vk_push_constant_info[] = {
 {% for u in uniforms %}
@@ -28,16 +28,16 @@ struct {{ program_name }}_ShaderInfo {
 {% endfor %}
     };
 
-    static constexpr csp::OglShaderSource csp_ogl_sources[] = {
+    static constexpr csp::ShaderSource csp_ogl_sources[] = {
 {% for s in ogl_sources %}
-        { "{{ s.filename }}" }{% if not loop.is_last %},{% endif %}
+        { {{ s.stage }}, "{{ s.filename }}" }{% if not loop.is_last %},{% endif %}
 
 {% endfor %}
     };
 
-    static constexpr csp::VkShaderSource csp_vk_sources[] = {
+    static constexpr csp::ShaderSource csp_vk_sources[] = {
 {% for s in vk_sources %}
-        { {{ s.stage_flags }}, "{{ s.filename }}" }{% if not loop.is_last %},{% endif %}
+        { {{ s.stage }}, "{{ s.filename }}" }{% if not loop.is_last %},{% endif %}
 
 {% endfor %}
     };

@@ -4,7 +4,7 @@ csp is a CMake-integrated code generation library that gives graphics engines a
 single source of truth for shader programs while allowing them to support multiple backends.
 You write your shaders once in Vulkan-compatible GLSL. csp compiles them to
 SPIR-V, transpiles to OpenGL-compatible GLSL, and uses SPIR-V reflection to
-generate C++ tables that the engine can use to create the render API structs..
+generate C++ tables that the engine can use to create the render API structs.
 
 ## System dependencies
 
@@ -15,7 +15,7 @@ generate C++ tables that the engine can use to create the render API structs..
 On Ubuntu/Debian:
 
 ```sh
-# Vulkan SDK (provides glslc and Vulkan headers)
+# Vulkan SDK provides glslc
 wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc \
   | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
 sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list \
@@ -60,7 +60,7 @@ csp_shader_dependency(<target> <program_name>)
 Wires the generated `.hpp`/`.cpp` into `<target>`:
 - Adds the generated `.cpp` as a private source
 - Adds the generated output directory to the target's include path
-- Links `csp::csp` (public csp headers, Vulkan headers) transitively
+- Links `csp::csp` (public csp headers) transitively
 
 ## Minimal example
 
@@ -69,7 +69,6 @@ Wires the generated `.hpp`/`.cpp` into `<target>`:
 cmake_minimum_required(VERSION 3.20)
 project(my_app)
 
-# Add the csp directory and pull in its cmake module
 add_subdirectory(csp)
 include(csp/cmake/csp.cmake)
 
@@ -85,30 +84,37 @@ csp_shader_dependency(my_app triangle)
 
 ```cpp
 // main.cpp
+#include <vulkan/vulkan.h>
+#include <GL/gl.h>
 #include "triangle_shader_info.hpp"  // generated
 
 void setup_vulkan_pipeline(VkDevice device, VkPipelineLayout* layout) {
-    // Use the generated table to create a push constant range
+    // Use the generated table to create a push constant range.
+    // stage_flags is a VkShaderStageFlagBits bitmask — cast directly.
     const auto& pc = triangle_ShaderInfo::csp_vk_push_constant_info[CSP_UNIFORM_TRIANGLE_PC];
-    VkPushConstantRange range{ pc.stage_flags, pc.offset, pc.size };
+    VkPushConstantRange range{ static_cast<VkShaderStageFlags>(pc.stage_flags), pc.offset, pc.size };
     // ... vkCreatePipelineLayout(device, ...) ...
 
-    // Load SPIR-V from the filename recorded at build time
+    // Load SPIR-V from the filename recorded at build time.
     for (uint32_t i = 0; i < triangle_descriptor.source_count; ++i) {
-        const char* spv_file = triangle_descriptor.vk_sources[i].filename.data();
+        const auto& src = triangle_descriptor.vk_sources[i];
+        // src.stage is csp::ShaderStage — map to VkShaderStageFlagBits as needed
+        const char* spv_file = src.filename.data();
         // ... load and create VkShaderModule from spv_file ...
     }
 }
 
 void setup_opengl_program(GLuint program) {
-    // Bind the uniform block to a binding point using the generated name
+    // Bind the uniform block using the generated name.
     const char* block_name = triangle_ShaderInfo::csp_ogl_uniform_info[CSP_UNIFORM_TRIANGLE_PC].name.data();
     GLuint block_index = glGetUniformBlockIndex(program, block_name);
     glUniformBlockBinding(program, block_index, CSP_UNIFORM_TRIANGLE_PC);
 
-    // Load OpenGL GLSL from the filename recorded at build time
+    // Load OpenGL GLSL from the filename recorded at build time.
     for (uint32_t i = 0; i < triangle_descriptor.source_count; ++i) {
-        const char* glsl_file = triangle_descriptor.ogl_sources[i].filename.data();
+        const auto& src = triangle_descriptor.ogl_sources[i];
+        // src.stage is csp::ShaderStage — map to GLenum for glCreateShader as needed
+        const char* glsl_file = src.filename.data();
         // ... load and compile glsl_file as a GL shader ...
     }
 }
@@ -125,8 +131,7 @@ For a program named `triangle`, csp generates `triangle_shader_info.hpp` and
 #define CSP_UNIFORM_TRIANGLE_<NAME> <index>
 ```
 
-Each index is valid for both the Vulkan and OpenGL tables simultaneously, and
-for the source tables.
+Each index is valid for both the Vulkan and OpenGL tables simultaneously.
 
 ### `triangle_ShaderInfo` (static tables)
 
@@ -134,17 +139,18 @@ for the source tables.
 struct triangle_ShaderInfo {
     // Vulkan push constant ranges — feed directly to vkCmdPushConstants /
     // VkPipelineLayoutCreateInfo. Non-push-constant entries have size = 0.
+    // stage_flags is a raw VkShaderStageFlagBits bitmask.
     static constexpr csp::VkPushConstantEntry csp_vk_push_constant_info[];
 
     // OpenGL uniform names — pass to glGetUniformBlockIndex (UBOs / push
     // constant blocks) or glGetUniformLocation (samplers).
     static constexpr csp::OglUniformEntry csp_ogl_uniform_info[];
 
-    // OpenGL transpiled shader filenames, one per stage in pipeline order.
-    static constexpr csp::OglShaderSource csp_ogl_sources[];
+    // OpenGL transpiled shader filenames and stages, one per stage in pipeline order.
+    static constexpr csp::ShaderSource csp_ogl_sources[];
 
-    // Vulkan SPIR-V shader filenames and stage flags, one per stage.
-    static constexpr csp::VkShaderSource  csp_vk_sources[];
+    // Vulkan SPIR-V shader filenames and stages, one per stage in pipeline order.
+    static constexpr csp::ShaderSource csp_vk_sources[];
 };
 ```
 
@@ -152,23 +158,33 @@ struct triangle_ShaderInfo {
 
 A global `const csp::ProgramDescriptor` (see public API below) that bundles pointers to all four
 tables together with their counts. Pass this to a backend that should not
-include the program-specific header directly:
+include the program-specific header directly.
 
 ## Public stable API (`include/csp/csp.hpp`)
-csp provides a header that is meant to be included by rendering engines that provides the with a stable API to the generated information. Engines can be passed a generated `ProgramDescriptor` reference from a client application to access the information they need
+csp provides a header meant to be included by rendering engines. It has no dependency on Vulkan or OpenGL headers. Engines receive a `ProgramDescriptor` from the client application and access the information they need.
 
 ```cpp
-struct VkPushConstantEntry { uint32_t offset; uint32_t size; VkShaderStageFlags stage_flags; };
-struct OglUniformEntry     { std::string_view name; };
-struct OglShaderSource     { std::string_view filename; };
-struct VkShaderSource      { VkShaderStageFlags stage; std::string_view filename; };
+enum class ShaderStage { Vertex, TessControl, TessEval, Geometry, Fragment, Compute };
+
+struct VkPushConstantEntry {
+    uint32_t offset;
+    uint32_t size;
+    uint32_t stage_flags; // VkShaderStageFlagBits bitmask — cast to VkShaderStageFlags
+};
+
+struct OglUniformEntry { std::string_view name; };
+
+struct ShaderSource {
+    ShaderStage      stage;
+    std::string_view filename;
+};
 
 struct ProgramDescriptor {
     const VkPushConstantEntry* vk_push_constants;
     const OglUniformEntry*     ogl_uniforms;
     uint32_t                   uniform_count;
-    const OglShaderSource*     ogl_sources;
-    const VkShaderSource*      vk_sources;
+    const ShaderSource*        ogl_sources;
+    const ShaderSource*        vk_sources;
     uint32_t                   source_count;
 };
 ```

@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <csp/csp.hpp>             // csp::VkPushConstantEntry, csp::OglUniformEntry
+#include <csp/csp.hpp>
 #include "triangle_shader_info.hpp"
 
 int main() {
@@ -27,13 +27,13 @@ int main() {
         all_ok = false;
     }
 
-    // Push constant is in the vertex stage.
-    constexpr VkShaderStageFlags pc_flags =
+    // Push constant is vertex-only: VK_SHADER_STAGE_VERTEX_BIT = 0x00000001.
+    constexpr uint32_t pc_flags =
         triangle_ShaderInfo::csp_vk_push_constant_info[CSP_UNIFORM_TRIANGLE_PC].stage_flags;
 
-    if ((pc_flags & VK_SHADER_STAGE_VERTEX_BIT) == 0) {
+    if (pc_flags != 0x00000001u) {
         std::fprintf(stderr,
-            "FAIL: push constant stage_flags (0x%08X) does not include VK_SHADER_STAGE_VERTEX_BIT\n",
+            "FAIL: push constant stage_flags expected 0x00000001 (VK_SHADER_STAGE_VERTEX_BIT), got 0x%08X\n",
             pc_flags);
         all_ok = false;
     }
@@ -68,7 +68,7 @@ int main() {
         all_ok = false;
     }
 
-    // OGL source filenames (vert then frag, canonical pipeline order).
+    // OGL source filenames and stages (vert then frag, canonical pipeline order).
     constexpr std::string_view ogl_vert = triangle_ShaderInfo::csp_ogl_sources[0].filename;
     constexpr std::string_view ogl_frag = triangle_ShaderInfo::csp_ogl_sources[1].filename;
 
@@ -86,7 +86,17 @@ int main() {
         all_ok = false;
     }
 
-    // Vulkan source filenames and stage flags.
+    if (triangle_ShaderInfo::csp_ogl_sources[0].stage != csp::ShaderStage::Vertex) {
+        std::fprintf(stderr, "FAIL: csp_ogl_sources[0].stage is not ShaderStage::Vertex\n");
+        all_ok = false;
+    }
+
+    if (triangle_ShaderInfo::csp_ogl_sources[1].stage != csp::ShaderStage::Fragment) {
+        std::fprintf(stderr, "FAIL: csp_ogl_sources[1].stage is not ShaderStage::Fragment\n");
+        all_ok = false;
+    }
+
+    // Vulkan source filenames and stages.
     constexpr std::string_view vk_vert_fn = triangle_ShaderInfo::csp_vk_sources[0].filename;
     constexpr std::string_view vk_frag_fn = triangle_ShaderInfo::csp_vk_sources[1].filename;
 
@@ -104,13 +114,13 @@ int main() {
         all_ok = false;
     }
 
-    if (triangle_ShaderInfo::csp_vk_sources[0].stage != VK_SHADER_STAGE_VERTEX_BIT) {
-        std::fprintf(stderr, "FAIL: csp_vk_sources[0].stage is not VK_SHADER_STAGE_VERTEX_BIT\n");
+    if (triangle_ShaderInfo::csp_vk_sources[0].stage != csp::ShaderStage::Vertex) {
+        std::fprintf(stderr, "FAIL: csp_vk_sources[0].stage is not ShaderStage::Vertex\n");
         all_ok = false;
     }
 
-    if (triangle_ShaderInfo::csp_vk_sources[1].stage != VK_SHADER_STAGE_FRAGMENT_BIT) {
-        std::fprintf(stderr, "FAIL: csp_vk_sources[1].stage is not VK_SHADER_STAGE_FRAGMENT_BIT\n");
+    if (triangle_ShaderInfo::csp_vk_sources[1].stage != csp::ShaderStage::Fragment) {
+        std::fprintf(stderr, "FAIL: csp_vk_sources[1].stage is not ShaderStage::Fragment\n");
         all_ok = false;
     }
 

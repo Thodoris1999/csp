@@ -23,13 +23,13 @@ static VkShaderStageFlagBits stage_flag_from_name(const std::string& stage) {
     throw std::runtime_error("Unknown shader stage name " + stage);
 }
 
-static std::string stage_flag_format(const std::string& stage) {
-    if (stage == "vert") return "VK_SHADER_STAGE_VERTEX_BIT";
-    if (stage == "tesc") return "VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT";
-    if (stage == "tese") return "VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT";
-    if (stage == "geom") return "VK_SHADER_STAGE_GEOMETRY_BIT";
-    if (stage == "frag") return "VK_SHADER_STAGE_FRAGMENT_BIT";
-    if (stage == "comp") return "VK_SHADER_STAGE_COMPUTE_BIT";
+static std::string shader_stage_format(const std::string& stage) {
+    if (stage == "vert") return "csp::ShaderStage::Vertex";
+    if (stage == "tesc") return "csp::ShaderStage::TessControl";
+    if (stage == "tese") return "csp::ShaderStage::TessEval";
+    if (stage == "geom") return "csp::ShaderStage::Geometry";
+    if (stage == "frag") return "csp::ShaderStage::Fragment";
+    if (stage == "comp") return "csp::ShaderStage::Compute";
     throw std::runtime_error("Unknown shader stage name " + stage);
 }
 
@@ -219,11 +219,12 @@ int main(int argc, char** argv) {
         std::string ogl_fn  = spv_fn.substr(0, spv_fn.size() - 4) + ".ogl.glsl";
 
         nlohmann::json vks;
-        vks["stage_flags"] = stage_flag_format(stage);
-        vks["filename"]    = spv_fn;
+        vks["stage"]    = shader_stage_format(stage);
+        vks["filename"] = spv_fn;
         vk_sources.push_back(vks);
 
         nlohmann::json ogls;
+        ogls["stage"]    = shader_stage_format(stage);
         ogls["filename"] = ogl_fn;
         ogl_sources.push_back(ogls);
     }

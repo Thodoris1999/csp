@@ -1,6 +1,8 @@
 # csp.cmake - Main cmake module for the csp graphics abstraction library
 # Provides csp_add_program and csp_shader_dependency macros
 
+include(GNUInstallDirs)
+
 # Root directory of the csp project (parent of the cmake/ directory)
 get_filename_component(_CSP_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
 get_filename_component(_CSP_ROOT_DIR "${_CSP_CMAKE_DIR}" DIRECTORY)
@@ -12,8 +14,21 @@ if(NOT TARGET csp::csp)
     add_library(csp_public_headers INTERFACE)
     add_library(csp::csp ALIAS csp_public_headers)
     target_include_directories(csp_public_headers INTERFACE
-        "${_CSP_ROOT_DIR}/include"
-        ${Vulkan_INCLUDE_DIRS})
+        $<BUILD_INTERFACE:${_CSP_ROOT_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    target_link_libraries(csp_public_headers INTERFACE Vulkan::Vulkan)
+
+    install(TARGETS csp_public_headers
+        EXPORT cspTargets
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    install(DIRECTORY include
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    install(EXPORT cspTargets
+        NAMESPACE csp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/csp)
 endif()
 
 # -----------------------------------------------------------------------

@@ -54,13 +54,15 @@ FRAG → COMP) regardless of the order they appear in the call.
 ### `csp_shader_dependency`
 
 ```cmake
-csp_shader_dependency(<target> <program_name>)
+csp_shader_dependency(<target> PUBLIC|INTERFACE|PRIVATE <program_name>...)
 ```
 
 Wires the generated `.hpp`/`.cpp` into `<target>`:
 - Adds the generated `.cpp` as a private source
-- Adds the generated output directory to the target's include path
-- Links `csp::csp` (public csp headers) transitively
+- Adds the generated output directory to the target's include path with the given visibility
+- Links `csp::csp` (public csp headers) with the given visibility
+
+Multiple program names may be listed after the visibility keyword.
 
 ## Minimal example
 
@@ -79,7 +81,7 @@ csp_add_program(triangle
 
 add_executable(my_app main.cpp)
 target_compile_features(my_app PRIVATE cxx_std_17)
-csp_shader_dependency(my_app triangle)
+csp_shader_dependency(my_app PRIVATE triangle)
 ```
 
 ```cpp

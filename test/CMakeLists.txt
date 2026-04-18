@@ -5,6 +5,6 @@ csp_add_program(triangle
 
 add_executable(test_csp main.cpp)
 target_compile_features(test_csp PRIVATE cxx_std_17)
-csp_shader_dependency(test_csp triangle)
+csp_shader_dependency(test_csp PRIVATE triangle)
 
 add_test(NAME csp_test COMMAND test_csp)

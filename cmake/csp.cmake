@@ -131,29 +131,31 @@ macro(csp_add_program program_name)
 endmacro()
 
 # -----------------------------------------------------------------------
-# csp_shader_dependency(target program_name)
+# csp_shader_dependency(target PUBLIC|INTERFACE|PRIVATE program_name...)
 #
 # Wires the generated .hpp/.cpp into `target` and sets up dependencies.
+# The visibility keyword controls the scope of the include directory and
+# csp::csp link propagated to dependents.
+# Generated .cpp sources are always PRIVATE (sources are never propagated).
 # -----------------------------------------------------------------------
-macro(csp_shader_dependency target program_name)
-    get_property(_gen_hpp    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_HPP")
-    get_property(_gen_cpp    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_CPP")
-    get_property(_inc_dir    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_INCDIR")
-    get_property(_gen_target GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_TARGET")
-
-    if(NOT _gen_hpp)
-        message(FATAL_ERROR "csp: Program '${program_name}' not found. Did you call csp_add_program(${program_name} ...) first?")
+macro(csp_shader_dependency target visibility)
+    if(NOT ("${visibility}" STREQUAL "PUBLIC" OR "${visibility}" STREQUAL "INTERFACE" OR "${visibility}" STREQUAL "PRIVATE"))
+        message(FATAL_ERROR "csp_shader_dependency: expected PUBLIC, INTERFACE, or PRIVATE after target, got '${visibility}'.")
     endif()
 
-    # Add generated sources to the target
-    target_sources(${target} PRIVATE "${_gen_cpp}")
+    foreach(program_name ${ARGN})
+        get_property(_gen_hpp    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_HPP")
+        get_property(_gen_cpp    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_CPP")
+        get_property(_inc_dir    GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_INCDIR")
+        get_property(_gen_target GLOBAL PROPERTY "CSP_PROGRAM_${program_name}_TARGET")
 
-    # Add the output directory so the generated .hpp is findable
-    target_include_directories(${target} PRIVATE "${_inc_dir}")
+        if(NOT _gen_hpp)
+            message(FATAL_ERROR "csp: Program '${program_name}' not found. Did you call csp_add_program(${program_name} ...) first?")
+        endif()
 
-    # Pull in the public csp headers (<csp/csp.hpp>) transitively
-    target_link_libraries(${target} PUBLIC csp::csp)
-
-    # Make target depend on the generation custom target
-    add_dependencies(${target} "${_gen_target}")
+        target_sources(${target} PRIVATE "${_gen_cpp}")
+        target_include_directories(${target} ${visibility} "${_inc_dir}")
+        target_link_libraries(${target} ${visibility} csp::csp)
+        add_dependencies(${target} "${_gen_target}")
+    endforeach()
 endmacro()

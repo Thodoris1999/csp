@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <csp/csp.hpp>
 #include "triangle_shader_info.hpp"
 
@@ -59,20 +60,20 @@ int main() {
         all_ok = false;
     }
 
-    // OGL source filenames and stages (vert then frag, canonical pipeline order).
+    // OGL source paths are absolute, verify the files exist.
     constexpr std::string_view ogl_vert = triangle_ShaderInfo::csp_ogl_sources[0].filename;
     constexpr std::string_view ogl_frag = triangle_ShaderInfo::csp_ogl_sources[1].filename;
 
-    if (ogl_vert != "triangle.vert.ogl.glsl") {
+    if (!std::filesystem::exists(ogl_vert)) {
         std::fprintf(stderr,
-            "FAIL: csp_ogl_sources[0].filename expected \"triangle.vert.ogl.glsl\", got \"%.*s\"\n",
+            "FAIL: csp_ogl_sources[0].filename does not exist: \"%.*s\"\n",
             static_cast<int>(ogl_vert.size()), ogl_vert.data());
         all_ok = false;
     }
 
-    if (ogl_frag != "triangle.frag.ogl.glsl") {
+    if (!std::filesystem::exists(ogl_frag)) {
         std::fprintf(stderr,
-            "FAIL: csp_ogl_sources[1].filename expected \"triangle.frag.ogl.glsl\", got \"%.*s\"\n",
+            "FAIL: csp_ogl_sources[1].filename does not exist: \"%.*s\"\n",
             static_cast<int>(ogl_frag.size()), ogl_frag.data());
         all_ok = false;
     }
@@ -87,20 +88,20 @@ int main() {
         all_ok = false;
     }
 
-    // Vulkan source filenames and stages.
+    // Vulkan source paths are absolute, verify the files exist.
     constexpr std::string_view vk_vert_fn = triangle_ShaderInfo::csp_vk_sources[0].filename;
     constexpr std::string_view vk_frag_fn = triangle_ShaderInfo::csp_vk_sources[1].filename;
 
-    if (vk_vert_fn != "triangle.vert.spv") {
+    if (!std::filesystem::exists(vk_vert_fn)) {
         std::fprintf(stderr,
-            "FAIL: csp_vk_sources[0].filename expected \"triangle.vert.spv\", got \"%.*s\"\n",
+            "FAIL: csp_vk_sources[0].filename does not exist: \"%.*s\"\n",
             static_cast<int>(vk_vert_fn.size()), vk_vert_fn.data());
         all_ok = false;
     }
 
-    if (vk_frag_fn != "triangle.frag.spv") {
+    if (!std::filesystem::exists(vk_frag_fn)) {
         std::fprintf(stderr,
-            "FAIL: csp_vk_sources[1].filename expected \"triangle.frag.spv\", got \"%.*s\"\n",
+            "FAIL: csp_vk_sources[1].filename does not exist: \"%.*s\"\n",
             static_cast<int>(vk_frag_fn.size()), vk_frag_fn.data());
         all_ok = false;
     }

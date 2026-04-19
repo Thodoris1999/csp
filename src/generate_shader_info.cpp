@@ -177,19 +177,19 @@ int main(int argc, char** argv) {
     nlohmann::json vk_sources  = nlohmann::json::array();
     nlohmann::json ogl_sources = nlohmann::json::array();
     for (auto& [stage, spv_path] : stage_spv_pairs) {
-        size_t slash        = spv_path.rfind('/');
-        std::string spv_fn  = (slash == std::string::npos) ? spv_path : spv_path.substr(slash + 1);
-        // Derive OGL filename: strip ".spv", append ".ogl.glsl"
-        std::string ogl_fn  = spv_fn.substr(0, spv_fn.size() - 4) + ".ogl.glsl";
+        size_t slash       = spv_path.rfind('/');
+        std::string spv_fn = (slash == std::string::npos) ? spv_path : spv_path.substr(slash + 1);
+        std::string dir    = (slash == std::string::npos) ? "" : spv_path.substr(0, slash + 1);
+        std::string ogl_path = dir + spv_fn.substr(0, spv_fn.size() - 4) + ".ogl.glsl";
 
         nlohmann::json vks;
         vks["stage"]    = shader_stage_format(stage);
-        vks["filename"] = spv_fn;
+        vks["filename"] = spv_path;
         vk_sources.push_back(vks);
 
         nlohmann::json ogls;
         ogls["stage"]    = shader_stage_format(stage);
-        ogls["filename"] = ogl_fn;
+        ogls["filename"] = ogl_path;
         ogl_sources.push_back(ogls);
     }
 

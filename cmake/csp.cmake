@@ -7,6 +7,7 @@ include(GNUInstallDirs)
 get_filename_component(_CSP_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
 get_filename_component(_CSP_ROOT_DIR "${_CSP_CMAKE_DIR}" DIRECTORY)
 set(_CSP_TEMPLATES_DIR "${_CSP_ROOT_DIR}/templates")
+set_property(GLOBAL PROPERTY _CSP_TEMPLATES_DIR "${_CSP_TEMPLATES_DIR}")
 
 # Interface library that carries the public csp include path.
 # csp_shader_dependency links targets against this so <csp/csp.hpp> is always findable.
@@ -50,6 +51,7 @@ endif()
 # -----------------------------------------------------------------------
 macro(csp_add_program program_name)
     cmake_parse_arguments(_CSP "" "" "VERT;FRAG;COMP;GEOM;TESC;TESE" ${ARGN})
+    get_property(_CSP_TEMPLATES_DIR GLOBAL PROPERTY _CSP_TEMPLATES_DIR)
 
     # Output directory for this program
     set(_out_dir "${CMAKE_CURRENT_BINARY_DIR}/csp_generated/${program_name}")
@@ -107,10 +109,10 @@ macro(csp_add_program program_name)
 
     # Build the stage:spv argument list for csp_generate
     set(_stage_spv_args "")
-    list(LENGTH _shaders _num_shaders)
-    math(EXPR _last_idx "${_num_shaders} - 1")
+    list(LENGTH _stage_names _num_stages)
+    math(EXPR _last_idx "${_num_stages} - 1")
     foreach(_i RANGE 0 ${_last_idx})
-        list(GET _stage_names    ${_i} _sn)
+        list(GET _stage_names     ${_i} _sn)
         list(GET _all_spv_outputs ${_i} _sp)
         list(APPEND _stage_spv_args "${_sn}:${_sp}")
     endforeach()

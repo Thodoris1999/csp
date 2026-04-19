@@ -13,14 +13,11 @@ enum class ShaderStage {
     Compute,
 };
 
-struct VkPushConstantEntry {
-    uint32_t offset;
-    uint32_t size;
-    uint32_t stage_flags; // bitmask of VkShaderStageFlagBits
-};
-
-struct OglUniformEntry {
-    std::string_view name;
+struct PushConstantEntry {
+    std::string_view name;        // "block.member", e.g. "pc.model"
+    uint32_t         offset;
+    uint32_t         size;
+    uint32_t         stage_flags; // bitmask of VkShaderStageFlagBits
 };
 
 struct ShaderSource {
@@ -28,15 +25,12 @@ struct ShaderSource {
     std::string_view filename;
 };
 
-// Stable descriptor passed to a graphics backend. Both uniform arrays share
-// the same index space, so a single CSP_UNIFORM_* macro indexes into both.
 struct ProgramDescriptor {
-    const VkPushConstantEntry* vk_push_constants;
-    const OglUniformEntry*     ogl_uniforms;
-    uint32_t                   uniform_count;
-    const ShaderSource*        ogl_sources;
-    const ShaderSource*        vk_sources;
-    uint32_t                   source_count;
+    const PushConstantEntry* push_constants;
+    uint32_t                 push_constant_count;
+    const ShaderSource*      ogl_sources;
+    const ShaderSource*      vk_sources;
+    uint32_t                 source_count;
 };
 
 } // namespace csp

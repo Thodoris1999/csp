@@ -8,8 +8,7 @@ const {{ program_name }}_ShaderInfo& {{ program_name }}_ShaderInfo::get() {
 }
 
 const csp::ProgramDescriptor {{ program_name }}_descriptor = {
-    {{ program_name }}_ShaderInfo::csp_vk_push_constant_info,
-    {{ program_name }}_ShaderInfo::csp_ogl_uniform_info,
+    {{ program_name }}_ShaderInfo::csp_push_constant_info,
     {{ uniform_count }},
     {{ program_name }}_ShaderInfo::csp_ogl_sources,
     {{ program_name }}_ShaderInfo::csp_vk_sources,

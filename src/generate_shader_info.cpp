@@ -40,12 +40,12 @@ static std::string format_stage_flags(uint32_t flags) {
 }
 
 struct UniformEntry {
-    std::string       name;
-    int               index;
-    uint32_t          offset;
-    uint32_t          size;
+    std::string        name;        // "block.member", e.g. "pc.model"
+    std::string        define_name; // "block_member", e.g. "pc_model"
+    int                index;
+    uint32_t           offset;
+    uint32_t           size;
     VkShaderStageFlags stage_flags;
-    bool              is_push_constant;
 };
 
 static std::vector<uint32_t> read_spirv(const std::string& path) {
@@ -65,7 +65,6 @@ static std::vector<uint32_t> read_spirv(const std::string& path) {
 
 struct StageReflection {
     std::vector<UniformEntry> push_constants;
-    std::vector<UniformEntry> textures;
 };
 
 static StageReflection reflect_stage(const std::string& spv_path, const std::string& stage) {
@@ -82,45 +81,25 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
 
     StageReflection sr;
 
-    // Push constants
+    // Push constants — enumerate per-member
     uint32_t pc_count = 0;
     result = spvReflectEnumeratePushConstantBlocks(&module, &pc_count, nullptr);
     if (result == SPV_REFLECT_RESULT_SUCCESS && pc_count > 0) {
         std::vector<SpvReflectBlockVariable*> pc_blocks(pc_count);
         spvReflectEnumeratePushConstantBlocks(&module, &pc_count, pc_blocks.data());
         for (auto* blk : pc_blocks) {
-            UniformEntry e;
-            e.name             = blk->name ? blk->name : "pc";
-            e.index            = 0; // assigned later
-            e.offset           = 0;
-            e.size             = blk->padded_size;
-            e.stage_flags      = stage_flag;
-            e.is_push_constant = true;
-            sr.push_constants.push_back(e);
-        }
-    }
-
-    // Descriptor bindings — samplers/textures
-    uint32_t binding_count = 0;
-    result = spvReflectEnumerateDescriptorBindings(&module, &binding_count, nullptr);
-    if (result == SPV_REFLECT_RESULT_SUCCESS && binding_count > 0) {
-        std::vector<SpvReflectDescriptorBinding*> bindings(binding_count);
-        spvReflectEnumerateDescriptorBindings(&module, &binding_count, bindings.data());
-        for (auto* b : bindings) {
-            if (b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER ||
-                b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-                b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-            {
+            std::string block_name = blk->name ? blk->name : "pc";
+            for (uint32_t m = 0; m < blk->member_count; ++m) {
+                const SpvReflectBlockVariable& mem = blk->members[m];
+                std::string member_name = mem.name ? mem.name : std::to_string(m);
                 UniformEntry e;
-                e.name             = b->name ? b->name : "";
-                e.index            = 0;
-                e.offset           = 0;
-                e.size             = 0;
-                e.stage_flags      = 0;
-                e.is_push_constant = false;
-                if (!e.name.empty()) {
-                    sr.textures.push_back(e);
-                }
+                e.name        = block_name + "." + member_name;
+                e.define_name = block_name + "_" + member_name;
+                e.index       = 0; // assigned later
+                e.offset      = mem.offset;
+                e.size        = mem.size;
+                e.stage_flags = stage_flag;
+                sr.push_constants.push_back(e);
             }
         }
     }
@@ -132,11 +111,8 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
 static std::vector<UniformEntry> merge_stages(
     const std::vector<std::pair<std::string, std::string>>& stage_spv_pairs)
 {
-    // name -> index into merged_pcs
     std::map<std::string, size_t> seen_pc;
-    std::map<std::string, bool>   seen_tex;
-    std::vector<UniformEntry>     merged_pcs;
-    std::vector<UniformEntry>     merged_texs;
+    std::vector<UniformEntry>     merged;
 
     for (auto& [stage, spv_path] : stage_spv_pairs) {
         StageReflection sr = reflect_stage(spv_path, stage);
@@ -144,26 +120,14 @@ static std::vector<UniformEntry> merge_stages(
         for (auto& e : sr.push_constants) {
             auto it = seen_pc.find(e.name);
             if (it == seen_pc.end()) {
-                seen_pc[e.name] = merged_pcs.size();
-                merged_pcs.push_back(e);
+                seen_pc[e.name] = merged.size();
+                merged.push_back(e);
             } else {
-                merged_pcs[it->second].stage_flags |= e.stage_flags;
-            }
-        }
-
-        for (auto& e : sr.textures) {
-            if (seen_tex.find(e.name) == seen_tex.end()) {
-                seen_tex[e.name] = true;
-                merged_texs.push_back(e);
+                merged[it->second].stage_flags |= e.stage_flags;
             }
         }
     }
 
-    std::vector<UniformEntry> merged;
-    merged.insert(merged.end(), merged_pcs.begin(), merged_pcs.end());
-    merged.insert(merged.end(), merged_texs.begin(), merged_texs.end());
-
-    // Assign indices
     for (int i = 0; i < static_cast<int>(merged.size()); ++i) {
         merged[i].index = i;
     }
@@ -240,12 +204,12 @@ int main(int argc, char** argv) {
 
     for (auto& u : uniforms) {
         nlohmann::json ju;
-        ju["name"]             = u.name;
-        ju["index"]            = u.index;
-        ju["offset"]           = u.offset;
-        ju["size"]             = u.size;
-        ju["stage_flags"]      = format_stage_flags(u.stage_flags);
-        ju["is_push_constant"] = u.is_push_constant;
+        ju["name"]        = u.name;
+        ju["define_name"] = u.define_name;
+        ju["index"]       = u.index;
+        ju["offset"]      = u.offset;
+        ju["size"]        = u.size;
+        ju["stage_flags"] = format_stage_flags(u.stage_flags);
         data["uniforms"].push_back(ju);
     }
 

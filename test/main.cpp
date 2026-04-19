@@ -6,30 +6,40 @@
 int main() {
     bool all_ok = true;
 
-    // Push constant block "pc" is at index 0 in both tables.
-    // CSP_UNIFORM_TRIANGLE_PC == 0
-    if (CSP_UNIFORM_TRIANGLE_PC != 0) {
+    // Push constant member "pc.transform" is at index 0.
+    // CSP_UNIFORM_TRIANGLE_PC_TRANSFORM == 0
+    if (CSP_UNIFORM_TRIANGLE_PC_TRANSFORM != 0) {
         std::fprintf(stderr,
-            "FAIL: CSP_UNIFORM_TRIANGLE_PC expected 0, got %d\n",
-            CSP_UNIFORM_TRIANGLE_PC);
+            "FAIL: CSP_UNIFORM_TRIANGLE_PC_TRANSFORM expected 0, got %d\n",
+            CSP_UNIFORM_TRIANGLE_PC_TRANSFORM);
         all_ok = false;
     }
 
-    // The push constant block covers a mat4 (64 bytes).
+    // pc.transform is a mat4 (64 bytes, offset 0).
     constexpr uint32_t expected_size = 64u;
     constexpr uint32_t actual_size =
-        triangle_ShaderInfo::csp_vk_push_constant_info[CSP_UNIFORM_TRIANGLE_PC].size;
+        triangle_ShaderInfo::csp_push_constant_info[CSP_UNIFORM_TRIANGLE_PC_TRANSFORM].size;
 
     if (actual_size != expected_size) {
         std::fprintf(stderr,
-            "FAIL: csp_vk_push_constant_info[PC].size expected %u, got %u\n",
+            "FAIL: csp_push_constant_info[PC_TRANSFORM].size expected %u, got %u\n",
             expected_size, actual_size);
+        all_ok = false;
+    }
+
+    constexpr uint32_t actual_offset =
+        triangle_ShaderInfo::csp_push_constant_info[CSP_UNIFORM_TRIANGLE_PC_TRANSFORM].offset;
+
+    if (actual_offset != 0u) {
+        std::fprintf(stderr,
+            "FAIL: csp_push_constant_info[PC_TRANSFORM].offset expected 0, got %u\n",
+            actual_offset);
         all_ok = false;
     }
 
     // Push constant is vertex-only: VK_SHADER_STAGE_VERTEX_BIT = 0x00000001.
     constexpr uint32_t pc_flags =
-        triangle_ShaderInfo::csp_vk_push_constant_info[CSP_UNIFORM_TRIANGLE_PC].stage_flags;
+        triangle_ShaderInfo::csp_push_constant_info[CSP_UNIFORM_TRIANGLE_PC_TRANSFORM].stage_flags;
 
     if (pc_flags != 0x00000001u) {
         std::fprintf(stderr,
@@ -38,33 +48,14 @@ int main() {
         all_ok = false;
     }
 
-    // The OGL name for the push constant block is "pc" (for glGetUniformBlockIndex).
-    constexpr std::string_view pc_ogl_name =
-        triangle_ShaderInfo::csp_ogl_uniform_info[CSP_UNIFORM_TRIANGLE_PC].name;
+    // Name is "pc.transform" for use with glGetUniformLocation.
+    constexpr std::string_view pc_name =
+        triangle_ShaderInfo::csp_push_constant_info[CSP_UNIFORM_TRIANGLE_PC_TRANSFORM].name;
 
-    if (pc_ogl_name != "pc") {
+    if (pc_name != "pc.transform") {
         std::fprintf(stderr,
-            "FAIL: csp_ogl_uniform_info[PC].name expected \"pc\", got \"%.*s\"\n",
-            static_cast<int>(pc_ogl_name.size()), pc_ogl_name.data());
-        all_ok = false;
-    }
-
-    // Sampler "tex" follows push constants — index 1.
-    // CSP_UNIFORM_TRIANGLE_TEX == 1
-    if (CSP_UNIFORM_TRIANGLE_TEX != 1) {
-        std::fprintf(stderr,
-            "FAIL: CSP_UNIFORM_TRIANGLE_TEX expected 1, got %d\n",
-            CSP_UNIFORM_TRIANGLE_TEX);
-        all_ok = false;
-    }
-
-    constexpr std::string_view tex_name =
-        triangle_ShaderInfo::csp_ogl_uniform_info[CSP_UNIFORM_TRIANGLE_TEX].name;
-
-    if (tex_name != "tex") {
-        std::fprintf(stderr,
-            "FAIL: csp_ogl_uniform_info[TEX].name expected \"tex\", got \"%.*s\"\n",
-            static_cast<int>(tex_name.size()), tex_name.data());
+            "FAIL: csp_push_constant_info[PC_TRANSFORM].name expected \"pc.transform\", got \"%.*s\"\n",
+            static_cast<int>(pc_name.size()), pc_name.data());
         all_ok = false;
     }
 
@@ -125,12 +116,11 @@ int main() {
     }
 
     // Verify the descriptor points to the same tables and has the right counts.
-    if (triangle_descriptor.vk_push_constants != triangle_ShaderInfo::csp_vk_push_constant_info ||
-        triangle_descriptor.ogl_uniforms      != triangle_ShaderInfo::csp_ogl_uniform_info      ||
-        triangle_descriptor.uniform_count     != 2u                                             ||
-        triangle_descriptor.ogl_sources       != triangle_ShaderInfo::csp_ogl_sources           ||
-        triangle_descriptor.vk_sources        != triangle_ShaderInfo::csp_vk_sources            ||
-        triangle_descriptor.source_count      != 2u)
+    if (triangle_descriptor.push_constants      != triangle_ShaderInfo::csp_push_constant_info ||
+        triangle_descriptor.push_constant_count != 1u                                          ||
+        triangle_descriptor.ogl_sources         != triangle_ShaderInfo::csp_ogl_sources        ||
+        triangle_descriptor.vk_sources          != triangle_ShaderInfo::csp_vk_sources         ||
+        triangle_descriptor.source_count        != 2u)
     {
         std::fprintf(stderr, "FAIL: triangle_descriptor fields are incorrect\n");
         all_ok = false;

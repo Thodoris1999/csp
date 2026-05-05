@@ -40,6 +40,7 @@ endif()
 #     [GEOM shader.geom]
 #     [TESC shader.tesc]
 #     [TESE shader.tese]
+#     [SPIRV_CROSS_FLAGS flag...]
 # )
 #
 # For each shader:
@@ -47,10 +48,17 @@ endif()
 #   2. Transpile SPIR-V -> OpenGL GLSL  (spirv-cross)
 # Then run csp_generate to produce .hpp/.cpp using SPIRV-Reflect + inja
 #
+# SPIRV_CROSS_FLAGS overrides the default spirv-cross flags
+# (--version 330 --no-es --glsl-emit-push-constant-as-ubo).
+#
 # Sets global properties so csp_shader_dependency can find the outputs.
 # -----------------------------------------------------------------------
 macro(csp_add_program program_name)
-    cmake_parse_arguments(_CSP "" "" "VERT;FRAG;COMP;GEOM;TESC;TESE" ${ARGN})
+    cmake_parse_arguments(_CSP "" "" "VERT;FRAG;COMP;GEOM;TESC;TESE;SPIRV_CROSS_FLAGS" ${ARGN})
+
+    if(NOT DEFINED _CSP_SPIRV_CROSS_FLAGS)
+        set(_CSP_SPIRV_CROSS_FLAGS --version 330 --no-es --glsl-emit-push-constant-as-ubo)
+    endif()
     get_property(_CSP_TEMPLATES_DIR GLOBAL PROPERTY _CSP_TEMPLATES_DIR)
 
     # Output directory for this program
@@ -88,8 +96,7 @@ macro(csp_add_program program_name)
             add_custom_command(
                 OUTPUT "${_ogl_out}"
                 COMMAND "${SPIRV_CROSS_EXECUTABLE}"
-                        --version 330
-                        --no-es
+                        ${_CSP_SPIRV_CROSS_FLAGS}
                         --output "${_ogl_out}"
                         "${_spv_out}"
                 DEPENDS "${_spv_out}"

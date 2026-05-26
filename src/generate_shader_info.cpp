@@ -48,6 +48,14 @@ struct UniformEntry {
     VkShaderStageFlags stage_flags;
 };
 
+struct UniformVarEntry {
+    std::string        name;
+    uint32_t           set;
+    uint32_t           binding;
+    VkShaderStageFlags stage_flags;
+    std::string        descriptor_type; // formatted csp::DescriptorType::* literal
+};
+
 static std::vector<uint32_t> read_spirv(const std::string& path) {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
     if (!f.is_open()) {
@@ -64,7 +72,8 @@ static std::vector<uint32_t> read_spirv(const std::string& path) {
 }
 
 struct StageReflection {
-    std::vector<UniformEntry> push_constants;
+    std::vector<UniformEntry>    push_constants;
+    std::vector<UniformVarEntry> uniform_vars;
 };
 
 static StageReflection reflect_stage(const std::string& spv_path, const std::string& stage) {
@@ -104,15 +113,67 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
         }
     }
 
+    // Descriptor bindings (uniform buffers, combined image samplers, …)
+    uint32_t db_count = 0;
+    result = spvReflectEnumerateDescriptorBindings(&module, &db_count, nullptr);
+    if (result == SPV_REFLECT_RESULT_SUCCESS && db_count > 0) {
+        std::vector<SpvReflectDescriptorBinding*> db(db_count);
+        spvReflectEnumerateDescriptorBindings(&module, &db_count, db.data());
+        for (auto* b : db) {
+            UniformVarEntry e;
+            e.name        = b->name ? b->name : "";
+            e.set         = b->set;
+            e.binding     = b->binding;
+            e.stage_flags = stage_flag;
+            switch (b->descriptor_type) {
+                case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+                    e.descriptor_type = "csp::DescriptorType::Sampler";              break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                    e.descriptor_type = "csp::DescriptorType::CombinedImageSampler"; break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+                    e.descriptor_type = "csp::DescriptorType::SampledImage";         break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                    e.descriptor_type = "csp::DescriptorType::StorageImage";         break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+                    e.descriptor_type = "csp::DescriptorType::UniformTexelBuffer";   break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                    e.descriptor_type = "csp::DescriptorType::StorageTexelBuffer";   break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                    e.descriptor_type = "csp::DescriptorType::UniformBuffer";        break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                    e.descriptor_type = "csp::DescriptorType::StorageBuffer";        break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+                    e.descriptor_type = "csp::DescriptorType::UniformBufferDynamic"; break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+                    e.descriptor_type = "csp::DescriptorType::StorageBufferDynamic"; break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                    e.descriptor_type = "csp::DescriptorType::InputAttachment";      break;
+                case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+                    e.descriptor_type = "csp::DescriptorType::AccelerationStructure"; break;
+                default:
+                    throw std::runtime_error(
+                        "Unhandled SpvReflectDescriptorType value: " +
+                        std::to_string(static_cast<int>(b->descriptor_type)));
+            }
+            sr.uniform_vars.push_back(e);
+        }
+    }
+
     spvReflectDestroyShaderModule(&module);
     return sr;
 }
 
-static std::vector<UniformEntry> merge_stages(
+struct MergeResult {
+    std::vector<UniformEntry>    push_constants;
+    std::vector<UniformVarEntry> uniform_vars;
+};
+
+static MergeResult merge_stages(
     const std::vector<std::pair<std::string, std::string>>& stage_spv_pairs)
 {
-    std::map<std::string, size_t> seen_pc;
-    std::vector<UniformEntry>     merged;
+    std::map<std::string, size_t>              seen_pc;
+    std::map<std::pair<uint32_t,uint32_t>, size_t> seen_uv; // key: (set, binding)
+    MergeResult merged;
 
     for (auto& [stage, spv_path] : stage_spv_pairs) {
         StageReflection sr = reflect_stage(spv_path, stage);
@@ -120,16 +181,27 @@ static std::vector<UniformEntry> merge_stages(
         for (auto& e : sr.push_constants) {
             auto it = seen_pc.find(e.name);
             if (it == seen_pc.end()) {
-                seen_pc[e.name] = merged.size();
-                merged.push_back(e);
+                seen_pc[e.name] = merged.push_constants.size();
+                merged.push_constants.push_back(e);
             } else {
-                merged[it->second].stage_flags |= e.stage_flags;
+                merged.push_constants[it->second].stage_flags |= e.stage_flags;
+            }
+        }
+
+        for (auto& e : sr.uniform_vars) {
+            auto key = std::make_pair(e.set, e.binding);
+            auto it  = seen_uv.find(key);
+            if (it == seen_uv.end()) {
+                seen_uv[key] = merged.uniform_vars.size();
+                merged.uniform_vars.push_back(e);
+            } else {
+                merged.uniform_vars[it->second].stage_flags |= e.stage_flags;
             }
         }
     }
 
-    for (int i = 0; i < static_cast<int>(merged.size()); ++i) {
-        merged[i].index = i;
+    for (int i = 0; i < static_cast<int>(merged.push_constants.size()); ++i) {
+        merged.push_constants[i].index = i;
     }
 
     return merged;
@@ -165,13 +237,15 @@ int main(int argc, char** argv) {
         stage_spv_pairs.emplace_back(stage, spv_path);
     }
 
-    std::vector<UniformEntry> uniforms;
+    MergeResult merged;
     try {
-        uniforms = merge_stages(stage_spv_pairs);
+        merged = merge_stages(stage_spv_pairs);
     } catch (const std::exception& ex) {
         std::fprintf(stderr, "Error during reflection: %s\n", ex.what());
         return 1;
     }
+    auto& uniforms     = merged.push_constants;
+    auto& uniform_vars = merged.uniform_vars;
 
     // Build shader source tables (one entry per stage, in argument order)
     nlohmann::json vk_sources  = nlohmann::json::array();
@@ -195,12 +269,14 @@ int main(int argc, char** argv) {
 
     // Build JSON data for inja
     nlohmann::json data;
-    data["program_name"]   = program_name;
-    data["uniform_count"]  = uniforms.size();
-    data["source_count"]   = stage_spv_pairs.size();
-    data["vk_sources"]     = vk_sources;
-    data["ogl_sources"]    = ogl_sources;
-    data["uniforms"]       = nlohmann::json::array();
+    data["program_name"]        = program_name;
+    data["push_constant_count"] = uniforms.size();
+    data["uniform_count"]       = uniform_vars.size();
+    data["source_count"]        = stage_spv_pairs.size();
+    data["vk_sources"]          = vk_sources;
+    data["ogl_sources"]         = ogl_sources;
+    data["uniforms"]            = nlohmann::json::array(); // push constant entries
+    data["uniform_vars"]        = nlohmann::json::array();
 
     for (auto& u : uniforms) {
         nlohmann::json ju;
@@ -211,6 +287,16 @@ int main(int argc, char** argv) {
         ju["size"]        = u.size;
         ju["stage_flags"] = format_stage_flags(u.stage_flags);
         data["uniforms"].push_back(ju);
+    }
+
+    for (auto& v : uniform_vars) {
+        nlohmann::json jv;
+        jv["name"]            = v.name;
+        jv["set"]             = v.set;
+        jv["binding"]         = v.binding;
+        jv["stage_flags"]     = format_stage_flags(v.stage_flags);
+        jv["descriptor_type"] = v.descriptor_type;
+        data["uniform_vars"].push_back(jv);
     }
 
     // Render templates

@@ -21,6 +21,16 @@ struct {{ program_name }}_ShaderInfo {
 {% endfor %}
     };
 
+    // One entry per descriptor binding.
+    // set/binding match the GLSL layout qualifiers.
+    // stage_flags is a VkShaderStageFlagBits bitmask.
+    static constexpr csp::UniformVar csp_uniform_var_info[] = {
+{% for v in uniform_vars %}
+        { "{{ v.name }}", {{ v.set }}, {{ v.binding }}, {{ v.stage_flags }}, {{ v.descriptor_type }} }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+    };
+
     static constexpr csp::ShaderSource csp_ogl_sources[] = {
 {% for s in ogl_sources %}
         { {{ s.stage }}, "{{ s.filename }}" }{% if not loop.is_last %},{% endif %}

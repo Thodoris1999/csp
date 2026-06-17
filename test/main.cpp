@@ -208,17 +208,47 @@ int main() {
     }
 
     // ---------------------------------------------------------------------------
+    // Push constant ranges
+    // ---------------------------------------------------------------------------
+
+    // pc.transform covers the whole push constant block (offset 0, size 64) and
+    // is vertex-only, so there must be exactly one range.
+    constexpr uint32_t range_offset = triangle_ShaderInfo::csp_push_constant_ranges[0].offset;
+    if (range_offset != 0u) {
+        std::fprintf(stderr,
+            "FAIL: csp_push_constant_ranges[0].offset expected 0, got %u\n", range_offset);
+        all_ok = false;
+    }
+
+    constexpr uint32_t range_size = triangle_ShaderInfo::csp_push_constant_ranges[0].size;
+    if (range_size != 64u) {
+        std::fprintf(stderr,
+            "FAIL: csp_push_constant_ranges[0].size expected 64, got %u\n", range_size);
+        all_ok = false;
+    }
+
+    constexpr uint32_t range_flags = triangle_ShaderInfo::csp_push_constant_ranges[0].stage_flags;
+    if (range_flags != 0x00000001u) {
+        std::fprintf(stderr,
+            "FAIL: csp_push_constant_ranges[0].stage_flags expected 0x00000001 (VK_SHADER_STAGE_VERTEX_BIT), got 0x%08X\n",
+            range_flags);
+        all_ok = false;
+    }
+
+    // ---------------------------------------------------------------------------
     // ProgramDescriptor integrity
     // ---------------------------------------------------------------------------
 
     // Verify the descriptor points to the same tables and has the right counts.
-    if (triangle_descriptor.push_constants      != triangle_ShaderInfo::csp_push_constant_info ||
-        triangle_descriptor.push_constant_count != 1u                                          ||
-        triangle_descriptor.uniform_vars        != triangle_ShaderInfo::csp_uniform_var_info   ||
-        triangle_descriptor.uniform_count       != 2u                                          ||
-        triangle_descriptor.ogl_sources         != triangle_ShaderInfo::csp_ogl_sources        ||
-        triangle_descriptor.vk_sources          != triangle_ShaderInfo::csp_vk_sources         ||
-        triangle_descriptor.source_count        != 2u)
+    if (triangle_descriptor.push_constants           != triangle_ShaderInfo::csp_push_constant_info   ||
+        triangle_descriptor.push_constant_count      != 1u                                            ||
+        triangle_descriptor.push_constant_ranges     != triangle_ShaderInfo::csp_push_constant_ranges ||
+        triangle_descriptor.push_constant_range_count != 1u                                           ||
+        triangle_descriptor.uniform_vars             != triangle_ShaderInfo::csp_uniform_var_info     ||
+        triangle_descriptor.uniform_count            != 2u                                            ||
+        triangle_descriptor.ogl_sources              != triangle_ShaderInfo::csp_ogl_sources          ||
+        triangle_descriptor.vk_sources               != triangle_ShaderInfo::csp_vk_sources           ||
+        triangle_descriptor.source_count             != 2u)
     {
         std::fprintf(stderr, "FAIL: triangle_descriptor fields are incorrect\n");
         all_ok = false;

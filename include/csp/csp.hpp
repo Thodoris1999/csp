@@ -35,6 +35,12 @@ struct PushConstantEntry {
     uint32_t         stage_flags; // bitmask of VkShaderStageFlagBits
 };
 
+struct PushConstantRange {
+    uint32_t offset;
+    uint32_t size;
+    uint32_t stage_flags; // bitmask of VkShaderStageFlagBits
+};
+
 struct UniformVar {
     std::string_view name;
     uint32_t         set;
@@ -51,6 +57,8 @@ struct ShaderSource {
 struct ProgramDescriptor {
     const PushConstantEntry* push_constants;
     uint32_t                 push_constant_count;
+    const PushConstantRange* push_constant_ranges;
+    uint32_t                 push_constant_range_count;
     const UniformVar*        uniform_vars;
     uint32_t                 uniform_count;
     const ShaderSource*      ogl_sources;

@@ -163,9 +163,16 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
     return sr;
 }
 
+struct PushConstantRangeEntry {
+    uint32_t           offset;
+    uint32_t           size;
+    VkShaderStageFlags stage_flags;
+};
+
 struct MergeResult {
-    std::vector<UniformEntry>    push_constants;
-    std::vector<UniformVarEntry> uniform_vars;
+    std::vector<UniformEntry>          push_constants;
+    std::vector<UniformVarEntry>       uniform_vars;
+    std::vector<PushConstantRangeEntry> push_constant_ranges;
 };
 
 static MergeResult merge_stages(
@@ -202,6 +209,26 @@ static MergeResult merge_stages(
 
     for (int i = 0; i < static_cast<int>(merged.push_constants.size()); ++i) {
         merged.push_constants[i].index = i;
+    }
+
+    // Derive VkPushConstantRange entries: one per unique stage_flags combination,
+    // covering the union of all member byte ranges with that combination.
+    std::map<VkShaderStageFlags, PushConstantRangeEntry> range_map;
+    for (auto& e : merged.push_constants) {
+        auto it = range_map.find(e.stage_flags);
+        if (it == range_map.end()) {
+            range_map[e.stage_flags] = { e.offset, e.size, e.stage_flags };
+        } else {
+            uint32_t cur_end  = it->second.offset + it->second.size;
+            uint32_t new_end  = e.offset + e.size;
+            uint32_t min_off  = std::min(it->second.offset, e.offset);
+            uint32_t max_end  = std::max(cur_end, new_end);
+            it->second.offset = min_off;
+            it->second.size   = max_end - min_off;
+        }
+    }
+    for (auto& [flags, r] : range_map) {
+        merged.push_constant_ranges.push_back(r);
     }
 
     return merged;
@@ -244,8 +271,9 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "Error during reflection: %s\n", ex.what());
         return 1;
     }
-    auto& uniforms     = merged.push_constants;
-    auto& uniform_vars = merged.uniform_vars;
+    auto& uniforms             = merged.push_constants;
+    auto& uniform_vars         = merged.uniform_vars;
+    auto& push_constant_ranges = merged.push_constant_ranges;
 
     // Build shader source tables (one entry per stage, in argument order)
     nlohmann::json vk_sources  = nlohmann::json::array();
@@ -269,14 +297,16 @@ int main(int argc, char** argv) {
 
     // Build JSON data for inja
     nlohmann::json data;
-    data["program_name"]        = program_name;
-    data["push_constant_count"] = uniforms.size();
-    data["uniform_count"]       = uniform_vars.size();
-    data["source_count"]        = stage_spv_pairs.size();
-    data["vk_sources"]          = vk_sources;
-    data["ogl_sources"]         = ogl_sources;
-    data["uniforms"]            = nlohmann::json::array(); // push constant entries
-    data["uniform_vars"]        = nlohmann::json::array();
+    data["program_name"]               = program_name;
+    data["push_constant_count"]        = uniforms.size();
+    data["push_constant_range_count"]  = push_constant_ranges.size();
+    data["uniform_count"]              = uniform_vars.size();
+    data["source_count"]               = stage_spv_pairs.size();
+    data["vk_sources"]                 = vk_sources;
+    data["ogl_sources"]                = ogl_sources;
+    data["uniforms"]                   = nlohmann::json::array(); // push constant entries
+    data["push_constant_ranges"]       = nlohmann::json::array();
+    data["uniform_vars"]               = nlohmann::json::array();
 
     for (auto& u : uniforms) {
         nlohmann::json ju;
@@ -287,6 +317,14 @@ int main(int argc, char** argv) {
         ju["size"]        = u.size;
         ju["stage_flags"] = format_stage_flags(u.stage_flags);
         data["uniforms"].push_back(ju);
+    }
+
+    for (auto& r : push_constant_ranges) {
+        nlohmann::json jr;
+        jr["offset"]      = r.offset;
+        jr["size"]        = r.size;
+        jr["stage_flags"] = format_stage_flags(r.stage_flags);
+        data["push_constant_ranges"].push_back(jr);
     }
 
     for (auto& v : uniform_vars) {

@@ -21,6 +21,15 @@ struct {{ program_name }}_ShaderInfo {
 {% endfor %}
     };
 
+    // One entry per push constant range, for VkPushConstantRange / vkCmdPushConstants.
+    // stage_flags is a VkShaderStageFlagBits bitmask.
+    static constexpr csp::PushConstantRange csp_push_constant_ranges[] = {
+{% for r in push_constant_ranges %}
+        { {{ r.offset }}, {{ r.size }}, {{ r.stage_flags }} }{% if not loop.is_last %},{% endif %}
+
+{% endfor %}
+    };
+
     // One entry per descriptor binding.
     // set/binding match the GLSL layout qualifiers.
     // stage_flags is a VkShaderStageFlagBits bitmask.

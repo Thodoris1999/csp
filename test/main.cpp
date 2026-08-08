@@ -167,6 +167,14 @@ int main() {
         all_ok = false;
     }
 
+    // binding 0 (sampler2D) has no backing block -> size == 0
+    constexpr uint32_t tex_size = triangle_ShaderInfo::csp_uniform_var_info[0].size;
+    if (tex_size != 0u) {
+        std::fprintf(stderr,
+            "FAIL: csp_uniform_var_info[0].size expected 0, got %u\n", tex_size);
+        all_ok = false;
+    }
+
     // --- binding 1: material (UniformBuffer) ---
     constexpr std::string_view mat_name =
         triangle_ShaderInfo::csp_uniform_var_info[1].name;
@@ -204,6 +212,14 @@ int main() {
     if (mat_type != csp::DescriptorType::UniformBuffer) {
         std::fprintf(stderr,
             "FAIL: csp_uniform_var_info[1].descriptor_type expected UniformBuffer\n");
+        all_ok = false;
+    }
+
+    // binding 1 (MaterialData { vec4 tint; }) -> std140 block size == 16
+    constexpr uint32_t mat_size = triangle_ShaderInfo::csp_uniform_var_info[1].size;
+    if (mat_size != 16u) {
+        std::fprintf(stderr,
+            "FAIL: csp_uniform_var_info[1].size expected 16, got %u\n", mat_size);
         all_ok = false;
     }
 

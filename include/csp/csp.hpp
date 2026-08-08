@@ -47,6 +47,8 @@ struct UniformVar {
     uint32_t         binding;
     uint32_t         stage_flags;    // bitmask of VkShaderStageFlagBits
     DescriptorType   descriptor_type;
+    uint32_t         size;           // byte size of the backing block; 0 for
+                                      // non-buffer descriptor types (samplers, images, ...)
 };
 
 struct ShaderSource {

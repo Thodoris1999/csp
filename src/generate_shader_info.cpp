@@ -50,10 +50,12 @@ struct UniformEntry {
 
 struct UniformVarEntry {
     std::string        name;
+    std::string        define_name; // sanitized identifier for CSP_UNIFORM_* defines
     uint32_t           set;
     uint32_t           binding;
     VkShaderStageFlags stage_flags;
     std::string        descriptor_type; // formatted csp::DescriptorType::* literal
+    uint32_t           size = 0;        // byte size of the backing block; 0 for non-buffer descriptors
 };
 
 static std::vector<uint32_t> read_spirv(const std::string& path) {
@@ -122,9 +124,11 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
         for (auto* b : db) {
             UniformVarEntry e;
             e.name        = b->name ? b->name : "";
+            e.define_name = e.name;
             e.set         = b->set;
             e.binding     = b->binding;
             e.stage_flags = stage_flag;
+            e.size        = b->block.size;
             switch (b->descriptor_type) {
                 case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
                     e.descriptor_type = "csp::DescriptorType::Sampler";              break;
@@ -203,6 +207,7 @@ static MergeResult merge_stages(
                 merged.uniform_vars.push_back(e);
             } else {
                 merged.uniform_vars[it->second].stage_flags |= e.stage_flags;
+                merged.uniform_vars[it->second].size = std::max(merged.uniform_vars[it->second].size, e.size);
             }
         }
     }
@@ -330,10 +335,12 @@ int main(int argc, char** argv) {
     for (auto& v : uniform_vars) {
         nlohmann::json jv;
         jv["name"]            = v.name;
+        jv["define_name"]     = v.define_name;
         jv["set"]             = v.set;
         jv["binding"]         = v.binding;
         jv["stage_flags"]     = format_stage_flags(v.stage_flags);
         jv["descriptor_type"] = v.descriptor_type;
+        jv["size"]            = v.size;
         data["uniform_vars"].push_back(jv);
     }
 

@@ -9,6 +9,12 @@
 #define CSP_UNIFORM_{{ upper(program_name) }}_{{ upper(u.define_name) }} {{ u.index }}
 {% endfor %}
 
+// Uniform var (descriptor binding) index definitions for {{ program_name }}.
+// Each index corresponds to an entry in csp_uniform_var_info.
+{% for v in uniform_vars %}
+#define CSP_UNIFORM_{{ upper(program_name) }}_{{ upper(v.define_name) }} {{ loop.index }}
+{% endfor %}
+
 struct {{ program_name }}_ShaderInfo {
     // One entry per push constant member.
     // offset/size are byte ranges for vkCmdPushConstants.
@@ -35,7 +41,7 @@ struct {{ program_name }}_ShaderInfo {
     // stage_flags is a VkShaderStageFlagBits bitmask.
     static constexpr csp::UniformVar csp_uniform_var_info[] = {
 {% for v in uniform_vars %}
-        { "{{ v.name }}", {{ v.set }}, {{ v.binding }}, {{ v.stage_flags }}, {{ v.descriptor_type }} }{% if not loop.is_last %},{% endif %}
+        { "{{ v.name }}", {{ v.set }}, {{ v.binding }}, {{ v.stage_flags }}, {{ v.descriptor_type }}, {{ v.size }} }{% if not loop.is_last %},{% endif %}
 
 {% endfor %}
     };

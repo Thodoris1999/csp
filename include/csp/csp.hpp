@@ -43,6 +43,8 @@ struct PushConstantRange {
 
 struct UniformVar {
     std::string_view name;
+    std::string_view block_name;    // block type name, e.g. "Bones" for "uniform Bones { ... } bones";
+                                    // empty for a descriptor that is not a block, such as a sampler
     uint32_t         set;
     uint32_t         binding;
     uint32_t         stage_flags;    // bitmask of VkShaderStageFlagBits

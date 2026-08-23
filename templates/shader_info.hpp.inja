@@ -41,7 +41,7 @@ struct {{ program_name }}_ShaderInfo {
     // stage_flags is a VkShaderStageFlagBits bitmask.
     static constexpr csp::UniformVar csp_uniform_var_info[] = {
 {% for v in uniform_vars %}
-        { "{{ v.name }}", {{ v.set }}, {{ v.binding }}, {{ v.stage_flags }}, {{ v.descriptor_type }}, {{ v.size }} }{% if not loop.is_last %},{% endif %}
+        { "{{ v.name }}", "{{ v.block_name }}", {{ v.set }}, {{ v.binding }}, {{ v.stage_flags }}, {{ v.descriptor_type }}, {{ v.size }} }{% if not loop.is_last %},{% endif %}
 
 {% endfor %}
     };

@@ -50,6 +50,8 @@ struct UniformEntry {
 
 struct UniformVarEntry {
     std::string        name;
+    std::string        block_name;  // block type name, e.g. "Bones" for "uniform Bones { ... } bones";
+                                    // empty for a descriptor that is not a block, such as a sampler
     std::string        define_name; // sanitized identifier for CSP_UNIFORM_* defines
     uint32_t           set;
     uint32_t           binding;
@@ -124,6 +126,9 @@ static StageReflection reflect_stage(const std::string& spv_path, const std::str
         for (auto* b : db) {
             UniformVarEntry e;
             e.name        = b->name ? b->name : "";
+            e.block_name  = (b->type_description && b->type_description->type_name)
+                                ? b->type_description->type_name
+                                : "";
             e.define_name = e.name;
             e.set         = b->set;
             e.binding     = b->binding;
@@ -335,6 +340,7 @@ int main(int argc, char** argv) {
     for (auto& v : uniform_vars) {
         nlohmann::json jv;
         jv["name"]            = v.name;
+        jv["block_name"]      = v.block_name;
         jv["define_name"]     = v.define_name;
         jv["set"]             = v.set;
         jv["binding"]         = v.binding;
